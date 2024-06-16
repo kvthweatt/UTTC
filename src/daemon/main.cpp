@@ -56,6 +56,8 @@
 namespace po = boost::program_options;
 namespace bf = boost::filesystem;
 
+void print_genesis_tx_hex(uint8_t);
+
 uint16_t parse_public_rpc_port(const po::variables_map &vm)
 {
   const auto &public_node_arg = daemon_args::arg_public_node;
@@ -124,6 +126,12 @@ bool isFat32(const wchar_t* root_path)
 
 int main(int argc, char const * argv[])
 {
+  //   If you're creating your own fork, you'll need to enable these two lines.
+  //   0 for Mainnet, 1 for Testnet, 2 for Stagenet
+  //print_genesis_tx_hex(0);  // 0 = Mainnet
+  //return 0;
+  //   End genesis creation
+  
   try {
 
     // TODO parse the debug options like set log level right here at start
@@ -374,4 +382,37 @@ int main(int argc, char const * argv[])
     LOG_ERROR("Exception in main!");
   }
   return 1;
+}
+
+void print_genesis_tx_hex(uint8_t nettype)
+{
+    using namespace cryptonote;
+    
+    account_base miner_acc1;
+    miner_acc1.generate();
+    
+    std::cout << "Gennerating miner wallet..." << std::endl;
+    std::cout << "Miner account address:" << std::endl;
+    std::cout << cryptonote::get_account_address_as_str((network_type)nettype, false, miner_acc1.get_keys().m_account_address);
+    std::cout << std::endl << "Miner spend secret key:"  << std::endl;
+    epee::to_hex::formatted(std::cout, epee::as_byte_span(miner_acc1.get_keys().m_spend_secret_key));
+    std::cout << std::endl << "Miner view secret key:" << std::endl;
+    epee::to_hex::formatted(std::cout, epee::as_byte_span(miner_acc1.get_keys().m_view_secret_key));
+    std::cout << std::endl << std::endl;    
+    
+    //Prepare genesis_tx
+    cryptonote::transaction tx_genesis;
+    cryptonote::construct_miner_tx(0, 0, 0, 0, 0, miner_acc1.get_keys().m_account_address, tx_genesis);
+    
+    std::cout << "Object:" << std::endl;
+    std::cout << obj_to_json_str(tx_genesis) << std::endl << std::endl;
+    
+    std::stringstream ss;
+    binary_archive<true> ba(ss);
+    ::serialization::serialize(ba, tx_genesis);
+    std::string tx_hex = ss.str();
+    std::cout << "Insert this line into your coin configuration file: " << std::endl;
+    std::cout << "std::string const GENESIS_TX = \"" << epee::string_tools::buff_to_hex_nodelimer(tx_hex) << "\";" << std::endl;
+    
+    return;
 }
